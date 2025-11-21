@@ -6,7 +6,15 @@ export const chatTopics = sqliteTable("chat_topics", {
   description: text("description"),
   user1Id: text("user1_id").notNull(),
   user2Id: text("user2_id").notNull(),
+  lastMessageAt: integer("last_message_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+export const topicReadStatus = sqliteTable("topic_read_status", {
+  id: text("id").primaryKey(),
+  topicId: text("topic_id").notNull(),
+  userId: text("user_id").notNull(),
+  lastReadAt: integer("last_read_at", { mode: "timestamp" }).notNull(),
 });
 
 export const messages = sqliteTable("messages", {
@@ -27,6 +35,7 @@ export const users = sqliteTable("users", {
 
 export type ChatTopic = typeof chatTopics.$inferSelect;
 export type NewChatTopic = typeof chatTopics.$inferInsert;
+export type TopicReadStatus = typeof topicReadStatus.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type NewMessage = typeof messages.$inferInsert;
 export type User = typeof users.$inferSelect;

@@ -8,39 +8,45 @@ const testUsers = [
   { id: "user-nurse1", username: "nurse1", password: "password123", name: "Jane Wilson" },
 ];
 
-const testTopics = [
-  {
-    id: "topic-1",
-    name: "General Consultation",
-    description: "General health consultation with Dr. Smith",
-    user1Id: "user-doctor1",
-    user2Id: "user-patient1",
-  },
-  {
-    id: "topic-2",
-    name: "Follow-up Checkup",
-    description: "Follow-up appointment discussion",
-    user1Id: "user-doctor1",
-    user2Id: "user-nurse1",
-  },
-  {
-    id: "topic-3",
-    name: "Medication Review",
-    description: "Review of current medications",
-    user1Id: "user-nurse1",
-    user2Id: "user-patient1",
-  },
-];
+// Generate 150+ topics for pagination testing
+const generateTopics = () => {
+  const topics = [
+    { id: "topic-1", name: "General Consultation", description: "General health consultation", user1Id: "user-doctor1", user2Id: "user-patient1" },
+    { id: "topic-2", name: "Follow-up Checkup", description: "Follow-up appointment", user1Id: "user-doctor1", user2Id: "user-nurse1" },
+    { id: "topic-3", name: "Medication Review", description: "Review medications", user1Id: "user-nurse1", user2Id: "user-patient1" },
+  ];
 
-const testMessages = [
-  { roomId: "topic-1", sender: "Dr. Smith", content: "Hello John, how are you feeling today?" },
-  { roomId: "topic-1", sender: "John Doe", content: "Hi Doctor, I've been having headaches lately." },
-  { roomId: "topic-1", sender: "Dr. Smith", content: "I see. How long have you been experiencing them?" },
-  { roomId: "topic-2", sender: "Dr. Smith", content: "Jane, can you check on patient in room 302?" },
-  { roomId: "topic-2", sender: "Jane Wilson", content: "Sure, I'll go there right away." },
-  { roomId: "topic-3", sender: "Jane Wilson", content: "John, have you been taking your medication regularly?" },
-  { roomId: "topic-3", sender: "John Doe", content: "Yes, twice a day as prescribed." },
-];
+  // Add 150 more topics for pagination test
+  for (let i = 4; i <= 155; i++) {
+    const userPairs = [
+      { user1Id: "user-doctor1", user2Id: "user-patient1" },
+      { user1Id: "user-doctor1", user2Id: "user-nurse1" },
+      { user1Id: "user-nurse1", user2Id: "user-patient1" },
+    ];
+    const pair = userPairs[i % 3];
+    topics.push({
+      id: `topic-${i}`,
+      name: `Chat Topic #${i}`,
+      description: `Test topic ${i} for pagination`,
+      ...pair,
+    });
+  }
+  return topics;
+};
+
+// Generate 150+ messages for a topic
+const generateMessages = (roomId: string, count: number) => {
+  const senders = ["Dr. Smith", "John Doe", "Jane Wilson"];
+  const msgs = [];
+  for (let i = 0; i < count; i++) {
+    msgs.push({
+      roomId,
+      sender: senders[i % senders.length],
+      content: `Message #${i + 1} - This is test message for pagination testing in room ${roomId}`,
+    });
+  }
+  return msgs;
+};
 
 async function seed() {
   console.log("Seeding test users...");
@@ -63,23 +69,55 @@ async function seed() {
     }
   }
 
-  console.log("\nSeeding chat topics...");
+  const testTopics = generateTopics();
+  console.log(`\nSeeding ${testTopics.length} chat topics...`);
+  let topicCount = 0;
   for (const topic of testTopics) {
     try {
       db.insert(chatTopics)
         .values({
           ...topic,
-          createdAt: new Date(),
+          lastMessageAt: new Date(Date.now() - Math.random() * 86400000 * 7), // Random time in last 7 days
+          createdAt: new Date(Date.now() - Math.random() * 86400000 * 30), // Random time in last 30 days
         })
         .run();
-      console.log(`Created topic: ${topic.name}`);
+      topicCount++;
     } catch {
-      console.log(`Topic ${topic.name} already exists`);
+      // Skip if exists
     }
   }
+  console.log(`Created ${topicCount} topics`);
 
-  console.log("\nSeeding messages...");
-  for (const msg of testMessages) {
+  // Generate 160 messages for topic-1 (for pagination testing)
+  console.log("\nSeeding 160 messages in topic-1...");
+  const topic1Messages = generateMessages("topic-1", 160);
+  let msgCount = 0;
+  for (let i = 0; i < topic1Messages.length; i++) {
+    const msg = topic1Messages[i];
+    try {
+      db.insert(messages)
+        .values({
+          id: crypto.randomUUID(),
+          ...msg,
+          timestamp: new Date(Date.now() - (topic1Messages.length - i) * 60000), // 1 minute apart
+        })
+        .run();
+      msgCount++;
+    } catch {
+      // Skip if exists
+    }
+  }
+  console.log(`Created ${msgCount} messages in topic-1`);
+
+  // Add some messages to other topics
+  console.log("\nSeeding messages in other topics...");
+  const otherMessages = [
+    { roomId: "topic-2", sender: "Dr. Smith", content: "Jane, can you check on patient in room 302?" },
+    { roomId: "topic-2", sender: "Jane Wilson", content: "Sure, I'll go there right away." },
+    { roomId: "topic-3", sender: "Jane Wilson", content: "John, have you been taking your medication?" },
+    { roomId: "topic-3", sender: "John Doe", content: "Yes, twice a day as prescribed." },
+  ];
+  for (const msg of otherMessages) {
     try {
       db.insert(messages)
         .values({
@@ -89,10 +127,13 @@ async function seed() {
         })
         .run();
     } catch {
-      // Skip if exists
+      // Skip
     }
   }
-  console.log(`Created ${testMessages.length} messages`);
+
+  console.log("\n" + "=".repeat(60));
+  console.log("SEED COMPLETE - PAGINATION TEST DATA");
+  console.log("=".repeat(60));
 
   console.log("\n=== Test Users ===");
   console.log("┌─────────────┬───────────────┬─────────────┐");
@@ -103,16 +144,12 @@ async function seed() {
   });
   console.log("└─────────────┴───────────────┴─────────────┘");
 
-  console.log("\n=== Chat Topics (Room IDs) ===");
-  console.log("┌────────────┬─────────────────────────┬───────────────────────┐");
-  console.log("│ Room ID    │ Topic                   │ Participants          │");
-  console.log("├────────────┼─────────────────────────┼───────────────────────┤");
-  testTopics.forEach((t) => {
-    const u1 = testUsers.find((u) => u.id === t.user1Id)?.name || "";
-    const u2 = testUsers.find((u) => u.id === t.user2Id)?.name || "";
-    console.log(`│ ${t.id.padEnd(10)} │ ${t.name.padEnd(23)} │ ${(u1 + " & " + u2).padEnd(21)} │`);
-  });
-  console.log("└────────────┴─────────────────────────┴───────────────────────┘");
+  console.log("\n=== Pagination Test Data ===");
+  console.log(`Topics: ${testTopics.length} (more than 100 page size)`);
+  console.log(`Messages in topic-1: 160 (more than 100 page size)`);
+  console.log("\nTest pagination:");
+  console.log("1. Login as doctor1, see 100 topics, click 'Load More'");
+  console.log("2. Join topic-1, see 100 messages, click 'Load More Messages'");
 }
 
 seed();

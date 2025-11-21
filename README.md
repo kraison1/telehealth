@@ -12,6 +12,12 @@ Real-time 1-on-1 chat application built with Next.js, TypeScript, Tailwind CSS, 
 - User join/leave notifications
 - Thai timezone timestamps (Asia/Bangkok)
 - Message history persistence (SQLite)
+- **Search topics** - Filter by topic name or user
+- **Popup chat windows** - Facebook-style chat in bottom-right corner
+- **Multiple chats** - Open up to 3 chat windows simultaneously
+- **Minimize/Maximize** - Collapse chat to avatar bubble
+- **Read/Unread status** - Blue dot indicator for unread topics
+- **Pagination** - Load more topics and messages (100 per page)
 
 ## Tech Stack
 
@@ -75,9 +81,13 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 1. Go to `/chat` (redirects to login if not authenticated)
 2. Login with test credentials (e.g., `doctor1` / `password123`)
 3. View your chat rooms or create a new one
-4. Click "Join" to enter a chat room
-5. Open another browser/incognito, login as different user, join same room
-6. Start chatting in real-time!
+4. **Search** - Use the search bar to filter topics by name or user
+5. **Click a topic** - Opens a small chat popup in bottom-right corner
+6. **Multiple chats** - Click more topics to open up to 3 chat windows
+7. **Minimize** - Click `-` button to collapse to avatar bubble
+8. **Close** - Click `×` to close chat window
+9. Open another browser/incognito, login as different user, join same room
+10. Start chatting in real-time!
 
 ## Project Structure
 

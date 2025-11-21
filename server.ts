@@ -3,12 +3,14 @@ import { parse } from "url";
 import next from "next";
 import { Server } from "socket.io";
 import { db } from "./db";
-import { messages } from "./db/schema";
-import { eq } from "drizzle-orm";
+import { messages, chatTopics } from "./db/schema";
+import { eq, desc } from "drizzle-orm";
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
 const handle = app.getRequestHandler();
+
+const PAGE_SIZE = 100;
 
 interface Message {
   id: string;
@@ -68,28 +70,62 @@ app.prepare().then(() => {
       };
 
       // Save to database
-      await db.insert(messages).values({
+      db.insert(messages).values({
         id: fullMessage.id,
         sender: fullMessage.sender,
         content: fullMessage.content,
         roomId: fullMessage.roomId,
         timestamp: fullMessage.timestamp,
-      });
+      }).run();
+
+      // Update lastMessageAt on topic
+      db.update(chatTopics)
+        .set({ lastMessageAt: fullMessage.timestamp })
+        .where(eq(chatTopics.id, message.roomId))
+        .run();
 
       io.to(message.roomId).emit("receive-message", fullMessage);
     });
 
     socket.on("get-history", async (roomId: string) => {
-      const history = await db
+      let query = db
         .select()
         .from(messages)
         .where(eq(messages.roomId, roomId))
-        .orderBy(messages.timestamp);
+        .orderBy(desc(messages.timestamp))
+        .limit(PAGE_SIZE);
 
-      socket.emit("message-history", history.map((m) => ({
-        ...m,
-        timestamp: m.timestamp,
-      })));
+      const history = query.all();
+
+      // Return in chronological order
+      socket.emit("message-history", {
+        messages: history.reverse().map((m) => ({
+          ...m,
+          timestamp: m.timestamp,
+        })),
+        hasMore: history.length === PAGE_SIZE,
+      });
+    });
+
+    socket.on("load-more-messages", async (roomId: string, beforeTimestamp: string) => {
+      const before = new Date(beforeTimestamp);
+
+      const history = db
+        .select()
+        .from(messages)
+        .where(eq(messages.roomId, roomId))
+        .orderBy(desc(messages.timestamp))
+        .all()
+        .filter((m) => m.timestamp < before)
+        .slice(0, PAGE_SIZE);
+
+      socket.emit("more-messages", {
+        messages: history.reverse().map((m) => ({
+          ...m,
+          timestamp: m.timestamp,
+        })),
+        hasMore: history.length === PAGE_SIZE,
+      });
     });
 
     socket.on("typing", (roomId: string, username: string) => {
