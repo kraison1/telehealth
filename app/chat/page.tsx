@@ -1,18 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { connectSocket, disconnectSocket } from "@/lib/socket";
+import { formatThaiTime } from "@/lib/utils";
+import { Avatar, ChatWindow, LoadingSpinner, Modal, Toast } from "@/components";
 import type { Socket } from "socket.io-client";
-
-interface Message {
-  id: string;
-  sender: string;
-  content: string;
-  timestamp: Date;
-  roomId: string;
-}
 
 interface Topic {
   id: string;
@@ -22,6 +16,7 @@ interface Topic {
   user2Name: string;
   isUnread: boolean;
   lastMessageAt: Date | null;
+  status: "open" | "closed";
 }
 
 interface User {
@@ -43,283 +38,17 @@ interface OpenChat {
   topicName: string;
   otherUserName: string;
   minimized: boolean;
+  status: "open" | "closed";
 }
 
-type FilterType = "all" | "unread" | "read";
-
-const formatThaiTime = (date: Date | string) => {
-  const d = new Date(date);
-  const options: Intl.DateTimeFormatOptions = {
-    timeZone: "Asia/Bangkok",
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  };
-  const formatted = d.toLocaleString("th-TH", options);
-  return formatted + " น.";
-};
-
-// Small Chat Window Component
-function ChatWindow({
-  chat,
-  socket,
-  username,
-  onClose,
-  onMinimize,
-}: {
-  chat: OpenChat;
-  socket: Socket | null;
-  username: string;
-  onClose: () => void;
-  onMinimize: () => void;
-}) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [typingUser, setTypingUser] = useState<string | null>(null);
-  const [hasMoreMessages, setHasMoreMessages] = useState(false);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.emit("join-room", chat.topicId, username);
-    socket.emit("get-history", chat.topicId);
-
-    // Mark as read
-    fetch("/api/topics/read", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topicId: chat.topicId }),
-    });
-
-    const handleMessage = (message: Message) => {
-      if (message.roomId === chat.topicId) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === message.id)) return prev;
-          return [...prev, message];
-        });
-      }
-    };
-
-    const handleHistory = (data: { messages: Message[]; hasMore: boolean }) => {
-      setMessages(data.messages);
-      setHasMoreMessages(data.hasMore);
-      setLoadingMessages(false);
-    };
-
-    const handleMoreMessages = (data: { messages: Message[]; hasMore: boolean }) => {
-      setMessages((prev) => [...data.messages, ...prev]);
-      setHasMoreMessages(data.hasMore);
-      setLoadingMessages(false);
-    };
-
-    const handleTyping = (user: string) => {
-      setTypingUser(user);
-    };
-
-    const handleStopTyping = () => {
-      setTypingUser(null);
-    };
-
-    socket.on("receive-message", handleMessage);
-    socket.on("message-history", handleHistory);
-    socket.on("more-messages", handleMoreMessages);
-    socket.on("user-typing", handleTyping);
-    socket.on("user-stop-typing", handleStopTyping);
-
-    return () => {
-      socket.off("receive-message", handleMessage);
-      socket.off("message-history", handleHistory);
-      socket.off("more-messages", handleMoreMessages);
-      socket.off("user-typing", handleTyping);
-      socket.off("user-stop-typing", handleStopTyping);
-    };
-  }, [socket, chat.topicId, username]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newMessage.trim() && socket) {
-      socket.emit("send-message", {
-        sender: username,
-        content: newMessage,
-        roomId: chat.topicId,
-      });
-      setNewMessage("");
-      socket.emit("stop-typing", chat.topicId);
-    }
-  };
-
-  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewMessage(e.target.value);
-    if (socket) {
-      socket.emit("typing", chat.topicId, username);
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      typingTimeoutRef.current = setTimeout(() => {
-        socket.emit("stop-typing", chat.topicId);
-      }, 1000);
-    }
-  };
-
-  const loadMoreMessages = () => {
-    if (hasMoreMessages && !loadingMessages && socket && messages.length > 0) {
-      setLoadingMessages(true);
-      const oldestMessage = messages[0];
-      socket.emit("load-more-messages", chat.topicId, oldestMessage.timestamp);
-    }
-  };
-
-  if (chat.minimized) {
-    return (
-      <div
-        onClick={onMinimize}
-        className="w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:bg-blue-600 transition relative"
-      >
-        <span className="text-white font-bold text-lg">
-          {chat.otherUserName.charAt(0).toUpperCase()}
-        </span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          className="absolute -top-1 -right-1 w-5 h-5 bg-gray-700 rounded-full flex items-center justify-center text-white text-xs hover:bg-gray-600"
-        >
-          ×
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-80 h-96 bg-white rounded-t-lg shadow-2xl flex flex-col border border-gray-300">
-      {/* Header */}
-      <div className="bg-white px-3 py-2 flex items-center border-b border-gray-200 rounded-t-lg">
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm mr-2">
-          {chat.otherUserName.charAt(0).toUpperCase()}
-        </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 text-sm">{chat.otherUserName}</h3>
-          <p className="text-xs text-green-500">Active</p>
-        </div>
-        <button
-          onClick={onMinimize}
-          className="p-1 hover:bg-gray-100 rounded transition"
-        >
-          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-          </svg>
-        </button>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-gray-100 rounded transition ml-1"
-        >
-          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Messages */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-3 py-2 bg-white">
-        {hasMoreMessages && (
-          <div className="text-center mb-2">
-            <button
-              onClick={loadMoreMessages}
-              disabled={loadingMessages}
-              className="text-blue-500 text-xs hover:underline disabled:opacity-50"
-            >
-              {loadingMessages ? "Loading..." : "Load older messages"}
-            </button>
-          </div>
-        )}
-
-        <div className="space-y-1">
-          {messages.map((message, index) => {
-            const isMe = message.sender === username;
-            const isLastInGroup = index === messages.length - 1 || messages[index + 1]?.sender !== message.sender;
-
-            return (
-              <div
-                key={message.id}
-                className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-              >
-                <div className="max-w-[80%]">
-                  <div
-                    className={`px-3 py-1.5 text-sm ${
-                      isMe
-                        ? "bg-blue-500 text-white rounded-2xl rounded-br-md"
-                        : "bg-gray-100 text-gray-900 rounded-2xl rounded-bl-md"
-                    }`}
-                  >
-                    {message.content}
-                  </div>
-                  {isLastInGroup && (
-                    <p className={`text-[10px] text-gray-400 mt-0.5 ${isMe ? "text-right" : ""}`}>
-                      {formatThaiTime(message.timestamp)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {typingUser && typingUser !== username && (
-          <div className="flex items-center gap-1 mt-1">
-            <div className="bg-gray-100 rounded-full px-3 py-1.5">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <form onSubmit={sendMessage} className="p-2 border-t border-gray-200">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={handleTyping}
-            placeholder="Aa"
-            className="flex-1 px-3 py-1.5 bg-gray-100 text-gray-900 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            disabled={!newMessage.trim()}
-            className="p-1.5 text-blue-500 hover:bg-gray-100 rounded-full transition disabled:opacity-30"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-            </svg>
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
+type FilterType = "all" | "unread" | "read" | "closed";
 
 export default function ChatRoom() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [socket, setSocket] = useState<Socket | null>(null);
   const username = session?.user?.name || "";
+  const userRole = session?.user?.role || "patient";
 
   // Topic list state
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -335,11 +64,21 @@ export default function ChatRoom() {
   // Pagination & Filter
   const [topicPage, setTopicPage] = useState(1);
   const [topicPagination, setTopicPagination] = useState<Pagination | null>(null);
-  const [topicFilter, setTopicFilter] = useState<FilterType>("all");
+  const [topicFilter, setTopicFilter] = useState<FilterType>("unread");
   const [loadingTopics, setLoadingTopics] = useState(false);
 
   // Open chat windows (bottom right)
   const [openChats, setOpenChats] = useState<OpenChat[]>([]);
+
+  // Toast message
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  // Create user modal (nurse only)
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState("patient");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -349,10 +88,10 @@ export default function ChatRoom() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      fetchTopics(1, topicFilter, true);
+      fetchTopics(1, topicFilter, searchQuery, true);
       fetchUsers();
     }
-  }, [status, topicFilter]);
+  }, [status, topicFilter, searchQuery]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -364,9 +103,11 @@ export default function ChatRoom() {
     };
   }, [status]);
 
-  const fetchTopics = async (page: number, filter: FilterType, reset = false) => {
+  const fetchTopics = async (page: number, filter: FilterType, search: string, reset = false) => {
     setLoadingTopics(true);
-    const res = await fetch(`/api/topics?page=${page}&filter=${filter}`);
+    const params = new URLSearchParams({ page: String(page), filter });
+    if (search) params.set("search", search);
+    const res = await fetch(`/api/topics?${params}`);
     if (res.ok) {
       const data = await res.json();
       if (reset) {
@@ -382,7 +123,7 @@ export default function ChatRoom() {
 
   const loadMoreTopics = () => {
     if (topicPagination?.hasMore && !loadingTopics) {
-      fetchTopics(topicPage + 1, topicFilter, false);
+      fetchTopics(topicPage + 1, topicFilter, searchQuery, false);
     }
   };
 
@@ -407,12 +148,44 @@ export default function ChatRoom() {
       }),
     });
 
+    const data = await res.json();
     if (res.ok) {
       setShowCreateModal(false);
       setNewTopicName("");
       setNewTopicDesc("");
       setSelectedUserId("");
-      fetchTopics(1, topicFilter, true);
+      fetchTopics(1, topicFilter, searchQuery, true);
+      setToast({ message: data.message || "Topic created successfully", type: "success" });
+    } else {
+      setToast({ message: data.error || "Failed to create topic", type: "error" });
+    }
+  };
+
+  const createUser = async () => {
+    if (!newUserName.trim() || !newUsername.trim() || !newUserPassword.trim()) return;
+
+    const res = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newUserName,
+        username: newUsername,
+        password: newUserPassword,
+        role: newUserRole,
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      setShowCreateUserModal(false);
+      setNewUserName("");
+      setNewUsername("");
+      setNewUserPassword("");
+      setNewUserRole("patient");
+      fetchUsers();
+      setToast({ message: data.message || "User created successfully", type: "success" });
+    } else {
+      setToast({ message: data.error || "Failed to create user", type: "error" });
     }
   };
 
@@ -433,6 +206,7 @@ export default function ChatRoom() {
       topicName: topic.name,
       otherUserName,
       minimized: false,
+      status: topic.status || "open",
     };
 
     setOpenChats((prev) => {
@@ -458,18 +232,19 @@ export default function ChatRoom() {
     );
   };
 
-  // Filter topics by search
-  const filteredTopics = topics.filter(
-    (t) =>
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.user1Name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.user2Name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleStatusChange = (topicId: string, newStatus: "open" | "closed") => {
+    setOpenChats((prev) =>
+      prev.map((c) => (c.topicId === topicId ? { ...c, status: newStatus } : c))
+    );
+    setTopics((prev) =>
+      prev.map((t) => (t.id === topicId ? { ...t, status: newStatus } : t))
+    );
+  };
 
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
+        <LoadingSpinner text="Loading..." />
       </div>
     );
   }
@@ -523,11 +298,22 @@ export default function ChatRoom() {
             </svg>
             New Chat
           </button>
+          {userRole === "nurse" && (
+            <button
+              onClick={() => setShowCreateUserModal(true)}
+              className="px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full transition flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+              New User
+            </button>
+          )}
         </div>
 
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-4">
-          {(["all", "unread", "read"] as FilterType[]).map((f) => (
+          {(["all", "unread", "read", "closed"] as FilterType[]).map((f) => (
             <button
               key={f}
               onClick={() => setTopicFilter(f)}
@@ -543,16 +329,17 @@ export default function ChatRoom() {
         </div>
 
         {/* Topic List */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {loadingTopics && topics.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">Loading...</p>
-          ) : filteredTopics.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
+          {/* Loading Overlay */}
+          {loadingTopics && <LoadingSpinner overlay text="Loading..." />}
+
+          {topics.length === 0 && !loadingTopics ? (
             <p className="text-gray-500 text-center py-8">
               {searchQuery ? "No results found" : "No chat rooms found"}
             </p>
           ) : (
             <div className="divide-y divide-gray-100">
-              {filteredTopics.map((topic) => {
+              {topics.map((topic) => {
                 const otherUserName = topic.user1Name === username ? topic.user2Name : topic.user1Name;
                 return (
                   <div
@@ -562,19 +349,15 @@ export default function ChatRoom() {
                       topic.isUnread ? "bg-blue-50" : ""
                     }`}
                   >
-                    {/* Avatar */}
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                      {otherUserName.charAt(0).toUpperCase()}
-                    </div>
+                    <Avatar name={otherUserName} size="lg" />
 
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className={`font-semibold text-gray-900 truncate ${topic.isUnread ? "font-bold" : ""}`}>
                           {topic.name}
                         </h3>
                         {topic.isUnread && (
-                          <span className="w-2.5 h-2.5 bg-blue-500 rounded-full flex-shrink-0"></span>
+                          <span className="w-2.5 h-2.5 bg-blue-500 rounded-full shrink-0"></span>
                         )}
                       </div>
                       <p className="text-gray-500 text-sm truncate">
@@ -582,9 +365,8 @@ export default function ChatRoom() {
                       </p>
                     </div>
 
-                    {/* Time */}
                     {topic.lastMessageAt && (
-                      <p className="text-gray-400 text-xs flex-shrink-0">
+                      <p className="text-gray-400 text-xs shrink-0">
                         {formatThaiTime(topic.lastMessageAt)}
                       </p>
                     )}
@@ -610,55 +392,54 @@ export default function ChatRoom() {
       </div>
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-xl">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">New Chat Room</h2>
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Topic Name"
-                value={newTopicName}
-                onChange={(e) => setNewTopicName(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <input
-                type="text"
-                placeholder="Description (optional)"
-                value={newTopicDesc}
-                onChange={(e) => setNewTopicDesc(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select user to chat with</option>
-                {allUsers.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name} (@{user.username})
-                  </option>
-                ))}
-              </select>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createTopic}
-                  className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition font-medium"
-                >
-                  Create
-                </button>
-              </div>
-            </div>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="New Chat Room"
+      >
+        <div className="space-y-4">
+          <input
+            type="text"
+            placeholder="Topic Name"
+            value={newTopicName}
+            onChange={(e) => setNewTopicName(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            type="text"
+            placeholder="Description (optional)"
+            value={newTopicDesc}
+            onChange={(e) => setNewTopicDesc(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select user to chat with</option>
+            {allUsers.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name} (@{user.username})
+              </option>
+            ))}
+          </select>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCreateModal(false)}
+              className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={createTopic}
+              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition font-medium"
+            >
+              Create
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* Chat Windows - Bottom Right */}
       <div className="fixed bottom-0 right-4 flex items-end gap-2 z-40">
@@ -668,11 +449,79 @@ export default function ChatRoom() {
             chat={chat}
             socket={socket}
             username={username}
+            userRole={userRole}
             onClose={() => closeChat(chat.topicId)}
             onMinimize={() => toggleMinimize(chat.topicId)}
+            onStatusChange={handleStatusChange}
+            onError={(msg) => setToast({ message: msg, type: "error" })}
+            onSuccess={(msg) => setToast({ message: msg, type: "success" })}
           />
         ))}
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Create User Modal (Nurse only) */}
+      <Modal
+        isOpen={showCreateUserModal}
+        onClose={() => setShowCreateUserModal(false)}
+        title="Create New User"
+      >
+        <div className="space-y-4">
+          <input
+            type="text"
+            placeholder="Full Name"
+            value={newUserName}
+            onChange={(e) => setNewUserName(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            type="text"
+            placeholder="Username"
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={newUserPassword}
+            onChange={(e) => setNewUserPassword(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={newUserRole}
+            onChange={(e) => setNewUserRole(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="patient">Patient</option>
+            <option value="doctor">Doctor</option>
+            <option value="nurse">Nurse</option>
+          </select>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCreateUserModal(false)}
+              className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={createUser}
+              className="flex-1 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition font-medium"
+            >
+              Create
+            </button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 }

@@ -18,6 +18,9 @@ Real-time 1-on-1 chat application built with Next.js, TypeScript, Tailwind CSS, 
 - **Minimize/Maximize** - Collapse chat to avatar bubble
 - **Read/Unread status** - Blue dot indicator for unread topics
 - **Pagination** - Load more topics and messages (100 per page)
+- **Close/Reopen chat** - Close chat rooms to prevent new messages
+- **Filter by status** - Filter topics by all, unread, read, or closed
+- **Role-based permissions** - Doctor, Patient, Nurse with different capabilities
 
 ## Tech Stack
 
@@ -62,11 +65,21 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Test Users
 
-| Username | Password | Name |
-|----------|----------|------|
-| doctor1 | password123 | Dr. Smith |
-| patient1 | password123 | John Doe |
-| nurse1 | password123 | Jane Wilson |
+| Username | Password | Name | Role |
+|----------|----------|------|------|
+| doctor1 | password123 | Dr. Smith | Doctor |
+| patient1 | password123 | John Doe | Patient |
+| nurse1 | password123 | Jane Wilson | Nurse |
+
+## Role Permissions
+
+| Permission | Doctor | Patient | Nurse |
+|------------|--------|---------|-------|
+| Create topic | ✅ | ✅ | ✅ |
+| Close/Reopen topic | ✅ | ❌ | ✅ |
+| Query all topics | ✅ | ❌ | ✅ |
+| Query own topics | ✅ | ✅ | ✅ |
+| Create users | ❌ | ❌ | ✅ |
 
 ## Test Chat Topics
 
@@ -85,9 +98,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 5. **Click a topic** - Opens a small chat popup in bottom-right corner
 6. **Multiple chats** - Click more topics to open up to 3 chat windows
 7. **Minimize** - Click `-` button to collapse to avatar bubble
-8. **Close** - Click `×` to close chat window
-9. Open another browser/incognito, login as different user, join same room
-10. Start chatting in real-time!
+8. **Close window** - Click `×` to close chat window
+9. **Close chat room** - Click `⋮` menu → "Close Chat" to close the room
+10. **Reopen chat** - Click `⋮` menu → "Reopen Chat" on closed rooms
+11. **Filter tabs** - Use "all", "unread", "read", "closed" tabs to filter topics
+12. Open another browser/incognito, login as different user, join same room
+13. Start chatting in real-time!
 
 ## Project Structure
 
@@ -112,7 +128,15 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 │   └── api/
 │       ├── auth/[...nextauth]/route.ts  # Auth API
 │       ├── topics/route.ts              # Topics API (GET/POST)
+│       ├── topics/[id]/status/route.ts  # Topic status API (PATCH)
+│       ├── topics/read/route.ts         # Mark topic as read (POST)
 │       └── users/route.ts               # Users API (GET)
+├── components/
+│   ├── Avatar.tsx          # User avatar component
+│   ├── ChatWindow.tsx      # Popup chat window component
+│   ├── LoadingSpinner.tsx  # Loading spinner with overlay
+│   ├── Modal.tsx           # Reusable modal dialog
+│   └── TypingIndicator.tsx # Animated typing dots
 ```
 
 ## Scripts

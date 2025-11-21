@@ -6,6 +6,7 @@ export const chatTopics = sqliteTable("chat_topics", {
   description: text("description"),
   user1Id: text("user1_id").notNull(),
   user2Id: text("user2_id").notNull(),
+  status: text("status").notNull().default("open"), // open, closed
   lastMessageAt: integer("last_message_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
@@ -30,6 +31,7 @@ export const users = sqliteTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  role: text("role").notNull().default("patient"), // doctor, patient, nurse
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 

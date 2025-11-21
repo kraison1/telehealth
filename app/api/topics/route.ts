@@ -15,19 +15,30 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get("page") || "1");
   const filter = searchParams.get("filter") || "all"; // all, unread, read
+  const search = searchParams.get("search") || ""; // search query
   const offset = (page - 1) * PAGE_SIZE;
 
-  // Get all topics for user
-  let topics = db
-    .select()
-    .from(chatTopics)
-    .where(
-      or(
-        eq(chatTopics.user1Id, session.user.id),
-        eq(chatTopics.user2Id, session.user.id)
+  const userRole = session.user.role;
+
+  // Get topics based on role
+  // Doctor & Nurse: see all topics
+  // Patient: see only their own topics
+  let topics;
+  if (userRole === "patient") {
+    topics = db
+      .select()
+      .from(chatTopics)
+      .where(
+        or(
+          eq(chatTopics.user1Id, session.user.id),
+          eq(chatTopics.user2Id, session.user.id)
+        )
       )
-    )
-    .all();
+      .all();
+  } else {
+    // Doctor or Nurse - can see all topics
+    topics = db.select().from(chatTopics).all();
+  }
 
   // Get read status for each topic
   const topicsWithStatus = topics.map((topic) => {
@@ -57,12 +68,27 @@ export async function GET(req: Request) {
     };
   });
 
-  // Filter by read status
+  // Filter by search query
   let filteredTopics = topicsWithStatus;
+  if (search) {
+    const searchLower = search.toLowerCase();
+    filteredTopics = filteredTopics.filter(
+      (t) =>
+        t.name.toLowerCase().includes(searchLower) ||
+        t.user1Name.toLowerCase().includes(searchLower) ||
+        t.user2Name.toLowerCase().includes(searchLower)
+    );
+  }
+
+  // Filter by read status or closed
   if (filter === "unread") {
-    filteredTopics = topicsWithStatus.filter((t) => t.isUnread);
+    filteredTopics = filteredTopics.filter((t) => t.isUnread && t.status !== "closed");
   } else if (filter === "read") {
-    filteredTopics = topicsWithStatus.filter((t) => !t.isUnread);
+    filteredTopics = filteredTopics.filter((t) => !t.isUnread && t.status !== "closed");
+  } else if (filter === "closed") {
+    filteredTopics = filteredTopics.filter((t) => t.status === "closed");
+  } else if (filter === "all") {
+    filteredTopics = filteredTopics.filter((t) => t.status !== "closed");
   }
 
   // Sort: unread first (by lastMessageAt desc), then read (by lastMessageAt desc)
@@ -103,11 +129,12 @@ export async function POST(req: Request) {
     description: description || null,
     user1Id: session.user.id,
     user2Id: otherUserId,
+    status: "open",
     lastMessageAt: null,
     createdAt: new Date(),
   };
 
   db.insert(chatTopics).values(newTopic).run();
 
-  return NextResponse.json(newTopic);
+  return NextResponse.json({ success: true, message: "Topic created successfully", data: newTopic });
 }

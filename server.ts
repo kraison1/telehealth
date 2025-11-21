@@ -63,6 +63,18 @@ app.prepare().then(() => {
     });
 
     socket.on("send-message", async (message: Omit<Message, "id" | "timestamp">) => {
+      // Check if topic is closed
+      const topic = db
+        .select()
+        .from(chatTopics)
+        .where(eq(chatTopics.id, message.roomId))
+        .get();
+
+      if (topic?.status === "closed") {
+        socket.emit("message-error", { error: "This chat room is closed" });
+        return;
+      }
+
       const fullMessage: Message = {
         ...message,
         id: crypto.randomUUID(),

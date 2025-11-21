@@ -3,9 +3,9 @@ import { users, chatTopics, messages } from "./schema";
 import bcrypt from "bcryptjs";
 
 const testUsers = [
-  { id: "user-doctor1", username: "doctor1", password: "password123", name: "Dr. Smith" },
-  { id: "user-patient1", username: "patient1", password: "password123", name: "John Doe" },
-  { id: "user-nurse1", username: "nurse1", password: "password123", name: "Jane Wilson" },
+  { id: "user-doctor1", username: "doctor1", password: "password123", name: "Dr. Smith", role: "doctor" },
+  { id: "user-patient1", username: "patient1", password: "password123", name: "John Doe", role: "patient" },
+  { id: "user-nurse1", username: "nurse1", password: "password123", name: "Jane Wilson", role: "nurse" },
 ];
 
 // Generate 150+ topics for pagination testing
@@ -60,6 +60,7 @@ async function seed() {
           username: user.username,
           password: hashedPassword,
           name: user.name,
+          role: user.role,
           createdAt: new Date(),
         })
         .run();
