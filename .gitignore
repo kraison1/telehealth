@@ -43,6 +43,3 @@ next-env.d.ts
 # database and migration files
 /chat.db
 /drizzle
-
-# custom local configs
-.claude/
