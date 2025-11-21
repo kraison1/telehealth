@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import TypingIndicator from '../TypingIndicator';
+import TypingIndicator from '../components/TypingIndicator';
 
 describe('TypingIndicator', () => {
   it('renders three dots', () => {

@@ -70,6 +70,11 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+
+### Deployment Guide
+- Deploy via Render (Production)
+- Deployed production URL: [https://telehealth-0jet.onrender.com](https://telehealth-0jet.onrender.com)
+
 ## Test Users
 
 | Username | Password | Name | Role |
@@ -117,36 +122,66 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ## Project Structure
 
 ```
-├── server.ts               # WebSocket server with Socket.IO
-├── lib/
-│   ├── auth.ts             # NextAuth.js configuration
-│   └── socket.ts           # Client-side socket connection
-├── db/
-│   ├── index.ts            # Database connection
-│   ├── schema.ts           # Drizzle schema (users, messages, chatTopics)
-│   └── seed.ts             # Seed test data
-├── drizzle/                # Migration files
-├── drizzle.config.ts       # Drizzle config
-├── app/
-│   ├── page.tsx            # Landing page
-│   ├── providers.tsx       # Session provider
-│   ├── login/
-│   │   └── page.tsx        # Login page
-│   ├── chat/
-│   │   └── page.tsx        # Chat room list & messaging UI
-│   └── api/
-│       ├── auth/[...nextauth]/route.ts  # Auth API
-│       ├── topics/route.ts              # Topics API (GET/POST with role filtering)
-│       ├── topics/[id]/status/route.ts  # Topic status API (PATCH - doctor/nurse only)
-│       ├── topics/read/route.ts         # Mark topic as read (POST)
-│       └── users/route.ts               # Users API (GET/POST - POST for nurse only)
-├── components/
-│   ├── Avatar.tsx          # User avatar component
-│   ├── ChatWindow.tsx      # Popup chat window component
-│   ├── LoadingSpinner.tsx  # Loading spinner with overlay
-│   ├── Modal.tsx           # Reusable modal dialog
-│   ├── Toast.tsx           # Success/Error notification toast
-│   └── TypingIndicator.tsx # Animated typing dots
+telehealth
+├── .env.local                  # Environment variables (DB, JWT, NextAuth secrets)
+├── README.md                   # Project documentation
+├── __tests__                   # Unit tests for UI components
+│   ├── Avatar.test.tsx         # Tests for Avatar component
+│   ├── LoadingSpinner.test.tsx # Tests for loading spinner
+│   ├── Modal.test.tsx          # Tests for modal component
+│   ├── Toast.test.tsx          # Tests for toast notifications
+│   ├── TypingIndicator.test.tsx# Tests for typing indicator
+│   └── page.test.tsx           # Tests for main pages
+├── app                         # Next.js App Router (frontend + server endpoints)
+│   ├── api                     # API routes (server-side logic)
+│   │   ├── auth/[...nextauth]/route.ts   # NextAuth configuration (login/session)
+│   │   ├── topics              # Topic management (chat topics)
+│   │   │   ├── [id]/status/route.ts # Update topic status (open/closed)
+│   │   │   ├── read/route.ts   # Mark topic as read
+│   │   │   └── route.ts        # List/create topics
+│   │   └── users/route.ts      # User API (search/list)
+│   ├── chat/page.tsx           # Main chat UI page
+│   ├── favicon.ico             # Website icon
+│   ├── globals.css             # Global project styles
+│   ├── layout.tsx              # Root application layout
+│   ├── login/page.tsx          # Login page
+│   ├── page.tsx                # Landing page
+│   └── providers.tsx           # Context providers (Auth, Theme, etc.)
+├── components                  # Reusable UI Components
+│   ├── Avatar.tsx              # User avatar component
+│   ├── ChatWindow.tsx          # Popup chat window component
+│   ├── LoadingSpinner.tsx      # Loading spinner
+│   ├── Modal.tsx               # Modal dialog component
+│   ├── Toast.tsx               # Toast notification component
+│   ├── TypingIndicator.tsx     # Typing indicator
+│   └── index.ts                # Component exports
+├── db
+│   ├── index.ts                # Database connection (SQLite via Drizzle ORM)
+│   ├── schema.ts               # Database schema definitions
+│   └── seed.ts                 # Database seed script
+├── drizzle.config.ts           # Configuration for drizzle-kit (generate/migrate)
+├── eslint.config.mjs           # ESLint configuration
+├── jest.config.ts              # Jest test configuration
+├── jest.setup.ts               # Jest setup (mocks, environment)
+├── lib
+│   ├── auth.ts                 # Helper functions for authentication (NextAuth)
+│   ├── socket.ts               # Socket.IO WebSocket logic
+│   └── utils.ts                # Utility functions
+├── next-env.d.ts               # TypeScript definitions for Next.js
+├── next.config.ts              # Next.js build/config settings
+├── package-lock.json           # Dependency lock file
+├── package.json                # Dependencies + npm scripts
+├── postcss.config.mjs          # PostCSS configuration
+├── public                      # Static assets (SVG icons, images)
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── next.svg
+│   ├── vercel.svg
+│   └── window.svg
+├── server.ts                   # Custom Node.js server + WebSocket server
+├── tsconfig.json               # TypeScript configuration
+└── types
+    └── next-auth.d.ts          # Type extensions for NextAuth
 ```
 
 ## Scripts
@@ -271,4 +306,7 @@ Create `.env.local` file:
 
 ```
 AUTH_SECRET=your-super-secret-key-change-in-production
+AUTH_URL=http://localhost:3000
+NEXTAUTH_URL=http://localhost:3000
+AUTH_TRUST_HOST=true
 ```

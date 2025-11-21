@@ -41,7 +41,7 @@ app.prepare().then(() => {
   });
 
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
+    // console.log("User connected:", socket.id);
 
     socket.on("join-room", (roomId: string, username: string) => {
       socket.join(roomId);
@@ -59,7 +59,7 @@ app.prepare().then(() => {
       socket.data.roomId = roomId;
 
       io.to(roomId).emit("user-joined", { username, users: room.users });
-      console.log(`${username} joined room ${roomId}`);
+      // console.log(`${username} joined room ${roomId}`);
     });
 
     socket.on("send-message", async (message: Omit<Message, "id" | "timestamp">) => {
@@ -157,7 +157,7 @@ app.prepare().then(() => {
           io.to(roomId).emit("user-left", { username, users: room.users });
         }
       }
-      console.log("User disconnected:", socket.id);
+      // console.log("User disconnected:", socket.id);
     });
   });
 
