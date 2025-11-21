@@ -35,6 +35,12 @@ Real-time 1-on-1 chat application built with Next.js, TypeScript, Tailwind CSS, 
 
 ## Getting Started
 
+### 0. Set up env
+- open terminal
+- cp .env.local .env
+- in terminal use command node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" > example result abcdefgh
+- open file .env add abcdefgh to AUTH_SECRET > example AUTH_SECRET = abcdefgh
+
 ### 1. Install dependencies
 
 ```bash

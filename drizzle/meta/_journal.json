@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1763707118632,
-      "tag": "0000_small_golden_guardian",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1763707491164,
-      "tag": "0001_neat_sentinels",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1763707765586,
-      "tag": "0002_easy_ironclad",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1763708747167,
-      "tag": "0003_spotty_aqueduct",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1763710608903,
-      "tag": "0004_nappy_tag",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1763711161114,
-      "tag": "0005_aspiring_dexter_bennett",
+      "when": 1763714517650,
+      "tag": "0000_ordinary_doctor_faustus",
       "breakpoints": true
     }
   ]
