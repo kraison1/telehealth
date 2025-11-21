@@ -9,6 +9,7 @@ Real-time 1-on-1 chat application built with Next.js, TypeScript, Tailwind CSS, 
 - Typing indicators
 - User join/leave notifications
 - Thai timezone timestamps (Asia/Bangkok)
+- Message history persistence (SQLite)
 
 ## Tech Stack
 
@@ -16,6 +17,8 @@ Real-time 1-on-1 chat application built with Next.js, TypeScript, Tailwind CSS, 
 - TypeScript
 - Tailwind CSS 4
 - Socket.IO
+- Drizzle ORM
+- SQLite (better-sqlite3)
 
 ## Getting Started
 
@@ -25,13 +28,20 @@ Real-time 1-on-1 chat application built with Next.js, TypeScript, Tailwind CSS, 
 npm install
 ```
 
-### 2. Run development server
+### 2. Setup database
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+### 3. Run development server
 
 ```bash
 npm run dev
 ```
 
-### 3. Open the app
+### 4. Open the app
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
@@ -47,6 +57,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ```
 ├── server.ts           # WebSocket server with Socket.IO
 ├── lib/socket.ts       # Client-side socket connection
+├── db/
+│   ├── index.ts        # Database connection
+│   └── schema.ts       # Drizzle schema
+├── drizzle/            # Migration files
+├── drizzle.config.ts   # Drizzle config
 ├── app/
 │   ├── page.tsx        # Landing page
 │   └── chat/
@@ -61,3 +76,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `npm run build` | Build for production |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
+| `npm run db:generate` | Generate database migrations |
+| `npm run db:migrate` | Run database migrations |
+| `npm run db:studio` | Open Drizzle Studio GUI |

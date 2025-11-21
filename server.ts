@@ -2,6 +2,9 @@ import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { Server } from "socket.io";
+import { db } from "./db";
+import { messages } from "./db/schema";
+import { eq } from "drizzle-orm";
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
@@ -57,14 +60,36 @@ app.prepare().then(() => {
       console.log(`${username} joined room ${roomId}`);
     });
 
-    socket.on("send-message", (message: Omit<Message, "id" | "timestamp">) => {
+    socket.on("send-message", async (message: Omit<Message, "id" | "timestamp">) => {
       const fullMessage: Message = {
         ...message,
         id: crypto.randomUUID(),
         timestamp: new Date(),
       };
 
+      // Save to database
+      await db.insert(messages).values({
+        id: fullMessage.id,
+        sender: fullMessage.sender,
+        content: fullMessage.content,
+        roomId: fullMessage.roomId,
+        timestamp: fullMessage.timestamp,
+      });
+
       io.to(message.roomId).emit("receive-message", fullMessage);
+    });
+
+    socket.on("get-history", async (roomId: string) => {
+      const history = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.roomId, roomId))
+        .orderBy(messages.timestamp);
+
+      socket.emit("message-history", history.map((m) => ({
+        ...m,
+        timestamp: m.timestamp,
+      })));
     });
 
     socket.on("typing", (roomId: string, username: string) => {

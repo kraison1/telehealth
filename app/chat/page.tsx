@@ -66,6 +66,10 @@ export default function ChatRoom() {
       setTypingUser(null);
     });
 
+    s.on("message-history", (history: Message[]) => {
+      setMessages(history);
+    });
+
     return () => {
       disconnectSocket();
     };
@@ -78,6 +82,7 @@ export default function ChatRoom() {
   const joinRoom = () => {
     if (username.trim() && roomId.trim() && socket) {
       socket.emit("join-room", roomId, username);
+      socket.emit("get-history", roomId);
       setJoined(true);
     }
   };
