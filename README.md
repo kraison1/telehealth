@@ -4,8 +4,10 @@ Real-time 1-on-1 chat application built with Next.js, TypeScript, Tailwind CSS, 
 
 ## Features
 
+- User authentication (NextAuth.js with JWT)
+- Chat room topics with 1-on-1 conversations
+- Create new chat rooms
 - Real-time messaging with WebSocket
-- 1-on-1 chat rooms
 - Typing indicators
 - User join/leave notifications
 - Thai timezone timestamps (Asia/Bangkok)
@@ -17,6 +19,7 @@ Real-time 1-on-1 chat application built with Next.js, TypeScript, Tailwind CSS, 
 - TypeScript
 - Tailwind CSS 4
 - Socket.IO
+- NextAuth.js (v5 beta)
 - Drizzle ORM
 - SQLite (better-sqlite3)
 
@@ -35,37 +38,71 @@ npm run db:generate
 npm run db:migrate
 ```
 
-### 3. Run development server
+### 3. Seed test data
+
+```bash
+npm run db:seed
+```
+
+### 4. Run development server
 
 ```bash
 npm run dev
 ```
 
-### 4. Open the app
+### 5. Open the app
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Test Users
+
+| Username | Password | Name |
+|----------|----------|------|
+| doctor1 | password123 | Dr. Smith |
+| patient1 | password123 | John Doe |
+| nurse1 | password123 | Jane Wilson |
+
+## Test Chat Topics
+
+| Room ID | Topic | Participants |
+|---------|-------|--------------|
+| topic-1 | General Consultation | Dr. Smith & John Doe |
+| topic-2 | Follow-up Checkup | Dr. Smith & Jane Wilson |
+| topic-3 | Medication Review | Jane Wilson & John Doe |
+
 ## How to Use
 
-1. Click "Start Chatting" on the home page
-2. Enter your name and a Room ID
-3. Click "Join Room"
-4. Share the same Room ID with another user to start chatting
+1. Go to `/chat` (redirects to login if not authenticated)
+2. Login with test credentials (e.g., `doctor1` / `password123`)
+3. View your chat rooms or create a new one
+4. Click "Join" to enter a chat room
+5. Open another browser/incognito, login as different user, join same room
+6. Start chatting in real-time!
 
 ## Project Structure
 
 ```
-├── server.ts           # WebSocket server with Socket.IO
-├── lib/socket.ts       # Client-side socket connection
+├── server.ts               # WebSocket server with Socket.IO
+├── lib/
+│   ├── auth.ts             # NextAuth.js configuration
+│   └── socket.ts           # Client-side socket connection
 ├── db/
-│   ├── index.ts        # Database connection
-│   └── schema.ts       # Drizzle schema
-├── drizzle/            # Migration files
-├── drizzle.config.ts   # Drizzle config
+│   ├── index.ts            # Database connection
+│   ├── schema.ts           # Drizzle schema (users, messages, chatTopics)
+│   └── seed.ts             # Seed test data
+├── drizzle/                # Migration files
+├── drizzle.config.ts       # Drizzle config
 ├── app/
-│   ├── page.tsx        # Landing page
-│   └── chat/
-│       └── page.tsx    # Chat room UI
+│   ├── page.tsx            # Landing page
+│   ├── providers.tsx       # Session provider
+│   ├── login/
+│   │   └── page.tsx        # Login page
+│   ├── chat/
+│   │   └── page.tsx        # Chat room list & messaging UI
+│   └── api/
+│       ├── auth/[...nextauth]/route.ts  # Auth API
+│       ├── topics/route.ts              # Topics API (GET/POST)
+│       └── users/route.ts               # Users API (GET)
 ```
 
 ## Scripts
@@ -78,4 +115,39 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `npm run lint` | Run ESLint |
 | `npm run db:generate` | Generate database migrations |
 | `npm run db:migrate` | Run database migrations |
+| `npm run db:seed` | Seed test users, topics, and messages |
 | `npm run db:studio` | Open Drizzle Studio GUI |
+
+## Authentication
+
+### How it works
+
+- Uses NextAuth.js v5 with JWT strategy
+- Session expires after 30 minutes of inactivity
+- Token is automatically refreshed on each request (sliding session)
+- Protected routes redirect to `/login` if not authenticated
+
+### Session Configuration
+
+```typescript
+session: {
+  strategy: "jwt",
+  maxAge: 30 * 60, // 30 minutes
+}
+```
+
+### Token Refresh
+
+NextAuth.js handles token refresh automatically:
+1. JWT token stored in HTTP-only cookie
+2. On each API/page request, token validity is checked
+3. If valid, session continues with updated expiry
+4. If expired, user redirected to login page
+
+## Environment Variables
+
+Create `.env.local` file:
+
+```
+AUTH_SECRET=your-super-secret-key-change-in-production
+```
